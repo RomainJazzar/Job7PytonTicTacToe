@@ -1,84 +1,155 @@
-# Tic Tac Toe Game without graphics
+import tkinter as tk
+from tkinter import messagebox
+import random
 
-def print_board(board):
-    # Function to display the board
-    for i in range(3):
-        print(" | ".join(board[i*3:(i+1)*3]))
-        if i < 2:
-            print("---------")
+# Initialisation de la fenêtre principale
+root = tk.Tk()
+root.title("Tic Tac Toe")
 
+# Variables globales
+board = [" " for _ in range(9)]  # Plateau vide
+current_player = "X"  # Le joueur "X" commence
+buttons = []
+difficulty = tk.StringVar(value="Facile")  # Niveau de difficulté par défaut
+
+# Fonction pour vérifier le gagnant
 def check_winner(board, sign):
-    # Check if the player with the given sign has won
     win_conditions = [
-        [0, 1, 2], [3, 4, 5], [6, 7, 8],  # Rows
-        [0, 3, 6], [1, 4, 7], [2, 5, 8],  # Columns
-        [0, 4, 8], [2, 4, 6]              # Diagonals
+        [0, 1, 2], [3, 4, 5], [6, 7, 8],  # Lignes
+        [0, 3, 6], [1, 4, 7], [2, 5, 8],  # Colonnes
+        [0, 4, 8], [2, 4, 6]              # Diagonales
     ]
-    for condition in win_conditions:
-        if all(board[i] == sign for i in condition):
-            return True
-    return False
+    return any(all(board[i] == sign for i in condition) for condition in win_conditions)
 
-def ia(board, sign):
-    # Basic AI to choose the best move
-    opponent = 'O' if sign == 'X' else 'X'
+# Fonction pour vérifier si le plateau est plein
+def is_full(board):
+    return all(cell != " " for cell in board)
+
+# Fonction pour l'intelligence artificielle
+def ia(board, sign, level):
+    opponent = "O" if sign == "X" else "X"
     
-    # Check if AI can win in one move
+    # Niveau Facile : l'IA joue de façon aléatoire
+    if level == "Facile":
+        empty_cells = [i for i, cell in enumerate(board) if cell == " "]
+        return random.choice(empty_cells) if empty_cells else False
+    
+    # Niveau Moyen : l'IA bloque l'adversaire et joue pour gagner
+    elif level == "Moyen":
+        # Vérifie si l'IA peut gagner en un coup
+        for i in range(9):
+            if board[i] == " ":
+                board[i] = sign
+                if check_winner(board, sign):
+                    return i
+                board[i] = " "
+        
+        # Bloque l'adversaire s'il est sur le point de gagner
+        for i in range(9):
+            if board[i] == " ":
+                board[i] = opponent
+                if check_winner(board, opponent):
+                    board[i] = " "
+                    return i
+                board[i] = " "
+        
+        # Sinon, jouer aléatoirement
+        empty_cells = [i for i, cell in enumerate(board) if cell == " "]
+        return random.choice(empty_cells) if empty_cells else False
+    
+    # Niveau Difficile : l'IA utilise la stratégie minimax pour jouer parfaitement
+    else:
+        return minimax(board, sign)["position"]
+
+# Fonction Minimax pour l'IA niveau Difficile
+def minimax(board, sign):
+    opponent = "O" if sign == "X" else "X"
+    
+    # Vérifie les conditions de fin de jeu
+    if check_winner(board, "X"):
+        return {"score": 1}
+    elif check_winner(board, "O"):
+        return {"score": -1}
+    elif is_full(board):
+        return {"score": 0}
+    
+    # Liste des mouvements possibles
+    moves = []
+    
+    # Parcours des cases vides et évaluation de chaque coup possible
     for i in range(9):
         if board[i] == " ":
             board[i] = sign
-            if check_winner(board, sign):
-                return i
+            result = minimax(board, opponent)
+            moves.append({"position": i, "score": result["score"]})
             board[i] = " "
     
-    # Block opponent if they're about to win
-    for i in range(9):
-        if board[i] == " ":
-            board[i] = opponent
-            if check_winner(board, opponent):
-                board[i] = " "
-                return i
-            board[i] = " "
+    # Choisir le meilleur mouvement en fonction du joueur
+    if sign == "X":
+        best_move = max(moves, key=lambda x: x["score"])
+    else:
+        best_move = min(moves, key=lambda x: x["score"])
     
-    # Choose first available cell
-    for i in range(9):
-        if board[i] == " ":
-            return i
-    
-    return False  # If no move is possible
+    return best_move
 
-def play_game():
-    # Main function to play the game
-    board = [" "] * 9  # Empty board
-    current_sign = "X"
-    player_choice = input("Do you want to play against the computer? (yes/no): ").lower()
-    vs_ai = player_choice == "yes"
+# Fonction pour gérer le clic sur un bouton
+def on_click(index):
+    global current_player
     
-    for turn in range(9):
-        print_board(board)
-        if current_sign == "X" or not vs_ai:
-            # Human player's turn
-            move = int(input(f"Player {current_sign}, choose a cell (0-8): "))
-        else:
-            # AI's turn
-            print("AI's turn...")
-            move = ia(board, current_sign)
-            if move is False:
-                print("AI error.")
-                return
+    if board[index] == " ":
+        board[index] = current_player
+        buttons[index].config(text=current_player)
         
-        if board[move] == " ":
-            board[move] = current_sign
-            if check_winner(board, current_sign):
-                print_board(board)
-                print(f"Player {current_sign} wins!")
-                return
-            current_sign = "O" if current_sign == "X" else "X"  # Switch player
-        else:
-            print("Cell already taken, choose another one.")
-    
-    print_board(board)
-    print("It's a tie!")
+        if check_winner(board, current_player):
+            messagebox.showinfo("Fin du jeu", f"Le joueur {current_player} a gagné !")
+            reset_board()
+            return
+        elif is_full(board):
+            messagebox.showinfo("Fin du jeu", "Match nul !")
+            reset_board()
+            return
+        
+        # Changement de joueur
+        current_player = "O" if current_player == "X" else "X"
+        
+        # Tour de l'IA si le joueur est seul
+        if current_player == "O" and difficulty.get() != "Deux Joueurs":
+            ia_move = ia(board, current_player, difficulty.get())
+            if ia_move is not False:
+                board[ia_move] = current_player
+                buttons[ia_move].config(text=current_player)
+                
+                if check_winner(board, current_player):
+                    messagebox.showinfo("Fin du jeu", f"L'IA ({current_player}) a gagné !")
+                    reset_board()
+                    return
+                elif is_full(board):
+                    messagebox.showinfo("Fin du jeu", "Match nul !")
+                    reset_board()
+                    return
+                
+                # Repasser à l'autre joueur
+                current_player = "X"
 
-# Start the game
-play_game()
+# Fonction pour réinitialiser le plateau
+def reset_board():
+    global board, current_player
+    board = [" " for _ in range(9)]
+    current_player = "X"
+    for button in buttons:
+        button.config(text=" ")
+
+# Création de l'interface graphique
+for i in range(9):
+    button = tk.Button(root, text=" ", width=10, height=3, command=lambda i=i: on_click(i))
+    button.grid(row=i // 3, column=i % 3)
+    buttons.append(button)
+
+# Menu de sélection de la difficulté
+frame = tk.Frame(root)
+frame.grid(row=3, column=0, columnspan=3)
+tk.Label(frame, text="Niveau de difficulté :").pack(side=tk.LEFT)
+tk.OptionMenu(frame, difficulty, "Facile", "Moyen", "Difficile", "Deux Joueurs").pack(side=tk.LEFT)
+
+# Lancer la fenêtre principale
+root.mainloop()
